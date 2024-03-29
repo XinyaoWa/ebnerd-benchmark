@@ -9,6 +9,7 @@ from torch.utils.data import Dataset
 import torch.optim as optim
 import torch.nn as nn
 import torch
+from ebrec.utils._constants import  DEFAULT_USER_COL
 
 from ebrec.utils._constants import DEFAULT_INVIEW_ARTICLES_COL, DEFAULT_LABELS_COL
 
@@ -22,6 +23,8 @@ from ebrec.utils._polars import shuffle_rows
 
 from ebrec.evaluation import AucScore
 from ebrec.utils._torch import save_checkpoint
+from ebrec.utils._behaviors import  add_known_user_column,  add_prediction_scores
+from ebrec.evaluation import MetricEvaluator, AucScore, NdcgScore, MrrScore
 
 
 @dataclass
@@ -141,10 +144,13 @@ def compute_auc_from_fixed_pos_neg_samples(
 def train(
     model: nn.Module,
     train_dataloader: DataLoader,
-    criterion: nn.Module,
     optimizer: optim.Optimizer,
+    scheduler: optim.lr_scheduler,
+    criterion=None,
+    df_train=None,
     num_epochs: int = 5,
     val_dataloader: DataLoader = None,
+    df_validation=None,
     state_dict_path: str = "model_state_dict.pt",
     patience: int = None,
     summary_writer: SummaryWriter = None,
@@ -203,6 +209,7 @@ def train(
                 optimizer.step()
                 optimizer.zero_grad()
 
+        scheduler.step()
         # ==> EVAL LOOP:
         if val_dataloader:
             model.train(False)
@@ -213,16 +220,29 @@ def train(
                 tqdm_disable=tqdm_disable,
             )
 
+            df_validation = add_prediction_scores(df_validation, all_outputs.tolist()).pipe(
+                add_known_user_column, known_users=df_train[DEFAULT_USER_COL]
+            )
+            
+            metrics = MetricEvaluator(
+                labels=df_validation["labels"].to_list(),
+                predictions=df_validation["scores"].to_list(),
+                metric_functions=[AucScore(), MrrScore(),  NdcgScore(k=5),  NdcgScore(k=10)],
+            )
+            result = metrics.evaluate()
+            print(result)
+
             if summary_writer is not None:
                 summary_writer.add_scalar(
                     tag="Val/Loss", scalar_value=val_loss, global_step=global_steps
                 )
 
             if monitor_metric == "auc":
-                val_auc = compute_auc_from_fixed_pos_neg_samples(
-                    y_true=np.ravel(all_labels.tolist()),
-                    y_pred=np.ravel(all_outputs.tolist()),
-                )
+                val_auc = result.evaluations["auc"]
+                # val_auc = compute_auc_from_fixed_pos_neg_samples(
+                #     y_true=np.ravel(all_labels.tolist()),
+                #     y_pred=np.ravel(all_outputs.tolist()),
+                # )
                 print(f"Val/AUC : {round(val_auc, 6)}")
                 if summary_writer is not None:
                     summary_writer.add_scalar(
