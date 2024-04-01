@@ -1,4 +1,5 @@
-class FastFormerConfig():
+from transformers import PretrainedConfig
+class FastFormerConfig(PretrainedConfig):
     def __init__(
         self,
         vocab_size=119547,
