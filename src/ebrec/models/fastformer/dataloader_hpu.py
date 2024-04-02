@@ -241,10 +241,10 @@ def train(
             result = metrics.evaluate()
             print(result)
 
-            if summary_writer is not None:
-                summary_writer.add_scalar(
-                    tag="Val/Loss", scalar_value=val_loss, global_step=global_steps
-                )
+            # if summary_writer is not None:
+            #     summary_writer.add_scalar(
+            #         tag="Val/Loss", scalar_value=val_loss, global_step=global_steps
+            #     )
 
             if monitor_metric == "auc":
                 val_auc = result.evaluations["auc"]
@@ -259,11 +259,11 @@ def train(
                     )
 
             # => MODEL CHECKPOINT
+            save_checkpoint(model, path=state_dict_path+f"_e{epoch}")
             # if monitor_metric == "loss" and val_loss < min_val_loss:
             #     save_checkpoint(model, path=state_dict_path)
             #     min_val_loss = val_loss
             #     early_stop = 0
-            save_checkpoint(model, path=state_dict_path+f"_e{epoch}")
             # elif monitor_metric == "auc" and val_auc > max_val_auc:
             #     save_checkpoint(model, path=state_dict_path)
             #     max_val_auc = val_auc

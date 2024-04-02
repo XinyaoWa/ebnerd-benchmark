@@ -158,6 +158,7 @@ def train(
     tqdm_disable: bool = False,
     tqdm_ncol: int = 80,
     monitor_metric: str = "loss",
+    device=torch.device("cpu")
 ) -> nn.Module:
     """ """
     min_val_loss = np.inf
@@ -201,13 +202,13 @@ def train(
                     global_step=global_steps,
                 )
             # => Accumulated gradient step:
-            if (
-                batch_idx % gradient_accumulation_steps == 0
-                or batch_idx == total_batches
-            ):
-                # => Take step and zero gradients
-                optimizer.step()
-                optimizer.zero_grad()
+            # if (
+            #     batch_idx % gradient_accumulation_steps == 0
+            #     or batch_idx == total_batches
+            # ):
+            # => Take step and zero gradients
+            optimizer.step()
+            optimizer.zero_grad()
 
         scheduler.step()
         # ==> EVAL LOOP:
@@ -250,25 +251,26 @@ def train(
                     )
 
             # => MODEL CHECKPOINT
-            if monitor_metric == "loss" and val_loss < min_val_loss:
-                save_checkpoint(model, path=state_dict_path)
-                min_val_loss = val_loss
-                early_stop = 0
-            elif monitor_metric == "auc" and val_auc > max_val_auc:
-                save_checkpoint(model, path=state_dict_path)
-                max_val_auc = val_auc
-                early_stop = 0
-            else:
-                early_stop += 1
+            save_checkpoint(model, path=state_dict_path+f"_e{epoch}")
+            # if monitor_metric == "loss" and val_loss < min_val_loss:
+            #     save_checkpoint(model, path=state_dict_path)
+            #     min_val_loss = val_loss
+            #     early_stop = 0
+            # elif monitor_metric == "auc" and val_auc > max_val_auc:
+            #     save_checkpoint(model, path=state_dict_path)
+            #     max_val_auc = val_auc
+            #     early_stop = 0
+            # else:
+            #     early_stop += 1
             # => EARLYSTOP
-            if patience is not None and early_stop == patience:
-                break
+            # if patience is not None and early_stop == patience:
+            #     break
 
     if summary_writer is not None:
         summary_writer.close()
 
     if val_dataloader:
-        model.load_state_dict(torch.load(state_dict_path), strict=True)
+        model.load_state_dict(torch.load(state_dict_path+f"_e{num_epochs-1}"), strict=True)
 
     return model
 
