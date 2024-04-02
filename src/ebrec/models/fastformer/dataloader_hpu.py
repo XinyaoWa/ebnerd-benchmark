@@ -219,6 +219,7 @@ def train(
         # print("loss: ", loss)
 
         scheduler.step()
+        save_checkpoint(model, path=state_dict_path+f"_e{epoch}")
         # ==> EVAL LOOP:
         if val_dataloader:
             model.train(False)
@@ -259,7 +260,6 @@ def train(
                     )
 
             # => MODEL CHECKPOINT
-            save_checkpoint(model, path=state_dict_path+f"_e{epoch}")
             # if monitor_metric == "loss" and val_loss < min_val_loss:
             #     save_checkpoint(model, path=state_dict_path)
             #     min_val_loss = val_loss
