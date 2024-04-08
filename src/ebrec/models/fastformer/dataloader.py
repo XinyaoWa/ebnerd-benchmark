@@ -282,6 +282,7 @@ def evaluate(
     tqdm_disable: bool = False,
     tqdm_ncol: int = 80,
     device: str = "cpu",
+    out_dir=None
 ) -> tuple[list[float], list[float], float]:
     model.eval()
     all_outputs = []

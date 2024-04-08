@@ -33,14 +33,16 @@ from ebrec.evaluation import MetricEvaluator, AucScore, NdcgScore, MrrScore
 
 sample_num = -1 # for debug, disable by set to -1
 use_device = "hpu"
+dataset_name = "ebnerd_large"
 
 MODEL_NAME = "FastFormer"
-dataset_name = "ebnerd_large"
 data_path = "/home/data/" ##vsr216, vsr134, gaudi-190
 # data_path = "/home/recsys2024/data" # gaudi-414
 path = Path(f"{data_path}/dataset/origin/{dataset_name}/")
+test_path = Path(f"{data_path}/dataset/origin/ebnerd_testset/")
 LOG_DIR = f"{data_path}/models/{MODEL_NAME}/{dataset_name}/log"
 MODEL_WEIGHTS = f"{data_path}/models/{MODEL_NAME}/{dataset_name}/weights/weights"
+out_dir = f"{data_path}/models/{MODEL_NAME}/{dataset_name}/out"
 TRANSFORMER_MODEL_NAME = f"{data_path}/models/bert-base-multilingual-cased"
 N_SAMPLES = "n"
 
@@ -116,11 +118,12 @@ else:
     df_validation.write_parquet(path.joinpath("validation.parquet"))
 
 if sample_num > 0:
-    df_train = df_train.sample(n=sample_num)
-    df_validation = df_validation.sample(n=sample_num)
+    df_train = df_train[:sample_num]
+    df_validation = df_validation[:sample_num]
 
 print(f"train shape: {df_train.shape}")
 print(f"validation shape: {df_validation.shape}")
+print(f"validation:\n{df_validation.head(5)}")
 
 label_lengths = df_validation[DEFAULT_INVIEW_ARTICLES_COL].list.len().to_list()
 time1 = time.time()
@@ -180,23 +183,35 @@ time4 = time.time()
 print(f"Prepared!! Cost {time4-time3} seconds")
 
 ##evaluate
-# all_outputs, all_labels, val_loss = evaluate_fastformer(
-#                                     model=model,
-#                                     dataloader=test_dataloader,
-#                                     criterion=loss,
-                                        # device=device)
+if eval_only_flag:
+    model.load_state_dict(torch.load(model_weights_path), strict=True)
+    model.train(False)
+    all_outputs, all_labels, val_loss = evaluate_fastformer(
+                                        model=model,
+                                        dataloader=test_dataloader,
+                                        criterion=loss,
+                                        device=device,
+                                        out_dir=out_dir)
+    print(f"all_outputs shape: {all_outputs.shape}")
+    print(f"all_labels shape: {all_labels.shape}")
+    print(f"sum of labels: {sum(label_lengths)}")
+    save_d = {"labels": all_labels, "outputs": all_outputs}  
+    torch.save(save_d, os.path.join(out_dir,"outputs"))
+    print(f"save outputs to: {os.path.join(out_dir,'outputs')}")
+    df_validation = add_prediction_scores(df_validation, all_outputs.tolist()).pipe(
+        add_known_user_column, known_users=df_train[DEFAULT_USER_COL]
+    )
+    metrics = MetricEvaluator(
+        labels=df_validation["labels"].to_list(),
+        predictions=df_validation["scores"].to_list(),
+        metric_functions=[AucScore(), MrrScore(),  NdcgScore(k=5),  NdcgScore(k=10)],
+    )
+    result = metrics.evaluate()
+    print(result)
+    time5 = time.time()
+    print(f"Finished!! Cost {time5-time0} seconds")
+    exit(0)
 
-# df_validation = add_prediction_scores(df_validation, all_outputs.tolist()).pipe(
-#     add_known_user_column, known_users=df_train[DEFAULT_USER_COL]
-# )
-
-# metrics = MetricEvaluator(
-#     labels=df_validation["labels"].to_list(),
-#     predictions=df_validation["scores"].to_list(),
-#     metric_functions=[AucScore(), MrrScore(),  NdcgScore(k=5),  NdcgScore(k=10)],
-# )
-# result = metrics.evaluate()
-# print(result)
 
 ##train
 model = train_fastformer(model=model, \

@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from tqdm import tqdm
 import polars as pl
 import numpy as np
+from pathlib import Path
 
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader
@@ -290,12 +291,14 @@ def evaluate(
     tqdm_disable: bool = False,
     tqdm_ncol: int = 80,
     device: str = "cpu",
+    out_dir=None,
 ) -> tuple[list[float], list[float], float]:
     model.eval()
     all_outputs = []
     all_labels = []
     loss = 0.0
     n_samples = 0
+    shape_list = []
     with torch.no_grad():
         progress_bar = tqdm(
             dataloader,
@@ -308,6 +311,7 @@ def evaluate(
             inputs, labels = batch_input_label_concatenation(inputs, labels)
             # Forward pass
             outputs = model(*inputs)
+            shape_list.append([labels.shape[0], outputs.shape[0]])
             batch_loss = criterion(outputs, labels)
             htcore.mark_step()
             # loss += batch_loss.item() * len(outputs)
@@ -321,4 +325,11 @@ def evaluate(
         all_labels = torch.cat(all_labels, dim=0)
         # loss = loss / n_samples
         loss = 0
+
+        shape_np = np.array(shape_list)
+        out_dir = out_dir if out_dir is not None else "tmp"
+        out_dir = Path(out_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        np.savetxt(out_dir.joinpath("shape.txt"), shape_np)
+        print(f"save shape to: {out_dir.joinpath('shape.txt')}")
     return all_outputs, all_labels, loss
