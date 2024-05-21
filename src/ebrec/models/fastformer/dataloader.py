@@ -315,3 +315,31 @@ def evaluate(
         all_labels = torch.cat(all_labels, dim=0)
         loss = loss / n_samples
     return all_outputs, all_labels, loss
+
+def predict(
+    model: nn.Module,
+    dataloader: DataLoader,
+    tqdm_disable: bool = False,
+    tqdm_ncol: int = 80,
+    device: str = "cpu",
+    out_dir=None
+) -> tuple[list[float], list[float], float]:
+    model.eval()
+    all_outputs = []
+    n_samples = 0
+    with torch.no_grad():
+        progress_bar = tqdm(
+            dataloader,
+            desc="Predicting",
+            total=dataloader.__len__(),
+            disable=tqdm_disable,
+            ncols=tqdm_ncol,
+        )
+        for inputs, labels in progress_bar:
+            inputs, labels = batch_input_label_concatenation(inputs, labels)
+            # Forward pass
+            outputs = model(*inputs)
+            n_samples += len(outputs)
+            all_outputs.append(outputs)
+        all_outputs = torch.cat(all_outputs, dim=0)
+    return all_outputs
