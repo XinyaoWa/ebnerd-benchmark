@@ -1,0 +1,37 @@
+feature {
+  name: "article_id_fixed"
+  value_count {
+    min: 30
+    max: 30
+  }
+  type: INT
+  int_domain {
+    name: "article_id"
+    min: 0
+    max: 9780295
+    is_categorical: true
+  }
+  annotation {
+    tag: "categorical"
+    tag: "list"
+  }
+}
+
+feature {
+    name: "article_ids_inview"
+    value_count {
+        min: 5
+        max: 100
+    }
+    type: INT
+    int_domain {
+        name: "article_id"
+        min: 0
+        max: 771
+        is_categorical: true
+    }
+    annotation {
+        tag: "categorical"
+        tag: "list"
+    }
+}
